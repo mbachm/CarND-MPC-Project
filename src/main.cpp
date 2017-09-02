@@ -108,21 +108,22 @@ int main() {
             ptsy_local[i] = (ptsx[i] - px)*sin(-psi) + (ptsy[i] - py)*cos(-psi);
           }
           
+          // const for local coordinates
+          const double px_local = 0.0, py_local = 0.0, psi_local = 0.0;
+          
           auto coeffs = polyfit(ptsx_local, ptsy_local, 3);
           
           //Calculating errors
           // The cross track error is calculated by evaluating at polynomial at x, f(x)
           // and subtracting y.
           // cte = polyeval(coeffs, x) - y;
-          // Due x and y are 0 as the we use car coordinates, the formula is changed to
-          // cte = polyeval(coeffs, 0);
-          double cte = polyeval(coeffs, 0);
+          double cte = polyeval(coeffs, px_local) - py_local;
           // Due to the sign starting at 0, the orientation error is -f'(x).
           // derivative of coeffs[0] + coeffs[1] * x -> coeffs[1]
           double epsi = psi - atan(coeffs[1]);
           
-          Eigen::VectorXd state(8);
-          state << px, py, psi, v, cte, epsi, delta, acceleration;
+          Eigen::VectorXd state(6);
+          state << px_local, py_local, psi_local, v, cte, epsi;
           
 
           /*
@@ -149,11 +150,8 @@ int main() {
 
           //TODO: fix this
           //Display the MPC predicted trajectory 
-//          const vector<double>& mpc_x_vals = solution[1];
-//          const vector<double>& mpc_y_vals = solution[2];
-          
-          const vector<double> mpc_x_vals = {0.0 , 10.0, 20.0};
-          const vector<double> mpc_y_vals = {0.0 , 10.0, 20.0};
+          const vector<double>& mpc_x_vals = solution[1];
+          const vector<double>& mpc_y_vals = solution[2];
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Green line

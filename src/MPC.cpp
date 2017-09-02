@@ -97,7 +97,7 @@ class FG_eval {
       AD<double> delta0 = vars[delta_start + t - 1];
       AD<double> a0 = vars[a_start + t - 1];
       
-      AD<double> f0 = coeffs[0] + coeffs[1] * x0;
+      AD<double> f0 = coeffs[0] + coeffs[1] * x0 + coeffs[2] * pow(x0, 2);
       AD<double> psides0 = CppAD::atan(coeffs[1]);
       
       // Recall the equations for the model:
@@ -128,8 +128,7 @@ vector<vector<double>> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs)
   size_t i;
   typedef CPPAD_TESTVECTOR(double) Dvector;
 
-  // Number of state vars: 8
-  // Number of state vars for constraints: 6
+  // Number of state vars: 6
   // Number of actuators: 2
   size_t n_vars = N * 6 + (N - 1) * 2;
   // See above (line 112)
@@ -148,22 +147,14 @@ vector<vector<double>> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs)
   double v = state[3];
   double cte = state[4];
   double epsi = state[5];
-  double delta = state[6];
-  double acceleration = state[7];
-  
-  // predict state in 100ms
-  //TODO: perhaps do this in main
-  double latency = 0.1;
-  x = x + v*cos(psi)*latency;
-  y = y + v*sin(psi)*latency;
-  psi = psi + v*delta/Lf*latency;
-  v = v + acceleration*latency;
 
   // Set the initial variable values
   vars[x_start] = x;
   vars[y_start] = y;
   vars[psi_start] = psi;
   vars[v_start] = v;
+  vars[cte_start] = cte;
+  vars[epsi_start] = epsi;
 
   Dvector vars_lowerbound(n_vars);
   Dvector vars_upperbound(n_vars);
