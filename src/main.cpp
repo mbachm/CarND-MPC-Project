@@ -91,35 +91,84 @@ int main() {
           double py = j[1]["y"];
           double psi = j[1]["psi"];
           double v = j[1]["speed"];
+          double delta = j[1]["steering_angle"];
+          // As mentioned in the "Tips and Tricks for the MPC Project" section, steer_value has to be
+          // mulitplied by -1 for the simulator
+          delta *= -1.0;
+          double acceleration = j[1]["throttle"];
+          
+          
+          //Convert waypoints to car coordinate system
+          //TODO: extract as function
+          Eigen::VectorXd ptsx_local(ptsx.size());
+          Eigen::VectorXd ptsy_local(ptsy.size());
+          
+          for (size_t i = 0; i < ptsx.size(); i++) {
+            ptsx_local[i] = (ptsx[i] - px)*cos(-psi) - (ptsy[i] - py)*sin(-psi);
+            ptsy_local[i] = (ptsx[i] - px)*sin(-psi) + (ptsy[i] - py)*cos(-psi);
+          }
+          
+          auto coeffs = polyfit(ptsx_local, ptsy_local, 3);
+          
+          //Calculating errors
+          // The cross track error is calculated by evaluating at polynomial at x, f(x)
+          // and subtracting y.
+          // cte = polyeval(coeffs, x) - y;
+          // Due x and y are 0 as the we use car coordinates, the formula is changed to
+          // cte = polyeval(coeffs, 0);
+          double cte = polyeval(coeffs, 0);
+          // Due to the sign starting at 0, the orientation error is -f'(x).
+          // derivative of coeffs[0] + coeffs[1] * x -> coeffs[1]
+          double epsi = psi - atan(coeffs[1]);
+          
+          Eigen::VectorXd state(8);
+          state << px, py, psi, v, cte, epsi, delta, acceleration;
+          
 
           /*
-          * TODO: Calculate steering angle and throttle using MPC.
           *
           * Both are in between [-1, 1].
           *
           */
-          double steer_value;
-          double throttle_value;
+          auto solution = mpc.Solve(state, coeffs);
+          
+          const double steer_value = solution[0][0];
+          const double throttle_value = solution[0][1];
+          std::cout << "vars0 0 " << solution[0][0] << std::endl;
+          std::cout << "vars0 1 " << solution[0][1] << std::endl;
+          std::cout << "steer_value " << throttle_value << std::endl;
+          std::cout << "throttle_value " << throttle_value << std::endl;
 
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
           // Otherwise the values will be in between [-deg2rad(25), deg2rad(25] instead of [-1, 1].
-          msgJson["steering_angle"] = steer_value;
+          // As mentioned in the "Tips and Tricks for the MPC Project" section, steer_value has to be
+          // mulitplied by -1 for the simulator
+          msgJson["steering_angle"] = -steer_value / deg2rad(25);
           msgJson["throttle"] = throttle_value;
 
+          //TODO: fix this
           //Display the MPC predicted trajectory 
-          vector<double> mpc_x_vals;
-          vector<double> mpc_y_vals;
+//          const vector<double>& mpc_x_vals = solution[1];
+//          const vector<double>& mpc_y_vals = solution[2];
+          
+          const vector<double> mpc_x_vals = {0.0 , 10.0, 20.0};
+          const vector<double> mpc_y_vals = {0.0 , 10.0, 20.0};
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Green line
 
           msgJson["mpc_x"] = mpc_x_vals;
           msgJson["mpc_y"] = mpc_y_vals;
-
+          
           //Display the waypoints/reference line
-          vector<double> next_x_vals;
-          vector<double> next_y_vals;
+          vector<double> next_x_vals(ptsx.size());
+          vector<double> next_y_vals(ptsy.size());
+          
+          for (size_t i = 0; i < ptsx_local.size(); ++i) {
+            next_x_vals[i] = ptsx_local[i];
+            next_y_vals[i] = ptsy_local[i];
+          }
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Yellow line
