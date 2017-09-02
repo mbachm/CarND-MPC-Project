@@ -3,9 +3,7 @@
 #include <chrono>
 #include <iostream>
 #include <thread>
-#include <vector>
-#include "Eigen-3.3/Eigen/Core"
-#include "Eigen-3.3/Eigen/QR"
+#include "utils.h"
 #include "MPC.h"
 #include "json.hpp"
 
@@ -32,37 +30,26 @@ string hasData(string s) {
   return "";
 }
 
-// Evaluate a polynomial.
-double polyeval(Eigen::VectorXd coeffs, double x) {
-  double result = 0.0;
-  for (int i = 0; i < coeffs.size(); i++) {
-    result += coeffs[i] * pow(x, i);
+/**
+ * convertWaypoints Converts the waypoints from the map coordinate system to the car coordinate system.
+ * @param ptsx vector<double> with x values of the values to find a fitting polynomial.
+ * @param ptsy vector<double> with y values of the values to find a fitting polynomial.
+ * @param px double value of current x-position of the car on global map.
+ * @param py double value of current y-position of the car on global map.
+ * @param psi double value of current psi.
+ * @output A vector<Eigen::VectorXd> vectors containing the x and y values of the waypoints in vehicle coordinates.
+ */
+vector<Eigen::VectorXd> convertWaypoints(vector<double> ptsx, vector<double> ptsy, double px, double py, double psi) {
+  assert(ptsx.size() == ptsy.size());
+  const int size = ptsx.size();
+  Eigen::VectorXd ptsx_local(size);
+  Eigen::VectorXd ptsy_local(size);
+  
+  for (size_t i = 0; i < ptsx.size(); i++) {
+    ptsx_local[i] = (ptsx[i] - px)*cos(-psi) - (ptsy[i] - py)*sin(-psi);
+    ptsy_local[i] = (ptsx[i] - px)*sin(-psi) + (ptsy[i] - py)*cos(-psi);
   }
-  return result;
-}
-
-// Fit a polynomial.
-// Adapted from
-// https://github.com/JuliaMath/Polynomials.jl/blob/master/src/Polynomials.jl#L676-L716
-Eigen::VectorXd polyfit(Eigen::VectorXd xvals, Eigen::VectorXd yvals,
-                        int order) {
-  assert(xvals.size() == yvals.size());
-  assert(order >= 1 && order <= xvals.size() - 1);
-  Eigen::MatrixXd A(xvals.size(), order + 1);
-
-  for (int i = 0; i < xvals.size(); i++) {
-    A(i, 0) = 1.0;
-  }
-
-  for (int j = 0; j < xvals.size(); j++) {
-    for (int i = 0; i < order; i++) {
-      A(j, i + 1) = A(j, i) * xvals(j);
-    }
-  }
-
-  auto Q = A.householderQr();
-  auto result = Q.solve(yvals);
-  return result;
+  return {ptsx_local, ptsy_local};
 }
 
 int main() {
@@ -95,18 +82,11 @@ int main() {
           // As mentioned in the "Tips and Tricks for the MPC Project" section, steer_value has to be
           // mulitplied by -1 for the simulator
           delta *= -1.0;
-          double acceleration = j[1]["throttle"];
-          
           
           //Convert waypoints to car coordinate system
-          //TODO: extract as function
-          Eigen::VectorXd ptsx_local(ptsx.size());
-          Eigen::VectorXd ptsy_local(ptsy.size());
-          
-          for (size_t i = 0; i < ptsx.size(); i++) {
-            ptsx_local[i] = (ptsx[i] - px)*cos(-psi) - (ptsy[i] - py)*sin(-psi);
-            ptsy_local[i] = (ptsx[i] - px)*sin(-psi) + (ptsy[i] - py)*cos(-psi);
-          }
+          vector<Eigen::VectorXd> local_waypoints = convertWaypoints(ptsx, ptsy, px, py, psi);
+          Eigen::VectorXd ptsx_local = local_waypoints[0];
+          Eigen::VectorXd ptsy_local = local_waypoints[1];
           
           // const for local coordinates
           const double px_local = 0.0, py_local = 0.0, psi_local = 0.0;
@@ -120,24 +100,18 @@ int main() {
           double cte = polyeval(coeffs, px_local) - py_local;
           // Due to the sign starting at 0, the orientation error is -f'(x).
           // derivative of coeffs[0] + coeffs[1] * x -> coeffs[1]
-          double epsi = psi - atan(coeffs[1]);
+          double epsi = psi_local - atan(polyderivativeeval(coeffs, px_local));
           
           Eigen::VectorXd state(6);
           state << px_local, py_local, psi_local, v, cte, epsi;
-          
-
-          /*
-          *
-          * Both are in between [-1, 1].
-          *
-          */
           auto solution = mpc.Solve(state, coeffs);
           
+          /*
+           * Both are in between [-1, 1].
+           */
           const double steer_value = solution[0][0];
           const double throttle_value = solution[0][1];
-          std::cout << "vars0 0 " << solution[0][0] << std::endl;
-          std::cout << "vars0 1 " << solution[0][1] << std::endl;
-          std::cout << "steer_value " << throttle_value << std::endl;
+          std::cout << "steer_value " << steer_value << std::endl;
           std::cout << "throttle_value " << throttle_value << std::endl;
 
           json msgJson;
@@ -148,8 +122,7 @@ int main() {
           msgJson["steering_angle"] = -steer_value / deg2rad(25);
           msgJson["throttle"] = throttle_value;
 
-          //TODO: fix this
-          //Display the MPC predicted trajectory 
+          //Display the MPC predicted trajectory
           const vector<double>& mpc_x_vals = solution[1];
           const vector<double>& mpc_y_vals = solution[2];
 

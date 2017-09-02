@@ -2,12 +2,13 @@
 #include <cppad/cppad.hpp>
 #include <cppad/ipopt/solve.hpp>
 #include "Eigen-3.3/Eigen/Core"
+#include "utils.h"
 
 using CppAD::AD;
 
 // TODO: Set the timestep length and duration
-const size_t N = 9;
-const double dt = 0.2;
+const size_t N = 10;
+const double dt = 0.15;
 
 // This value assumes the model presented in the classroom is used.
 //
@@ -20,7 +21,7 @@ const double dt = 0.2;
 //
 // This is the length from front to CoG that has a similar radius.
 const double Lf = 2.67;
-const double ref_v = 20;
+const double ref_v = 40;
 
 // The solver takes all the state variables and actuator
 size_t x_start = 0;
@@ -41,29 +42,27 @@ class FG_eval {
   typedef CPPAD_TESTVECTOR(AD<double>) ADvector;
   void operator()(ADvector& fg, const ADvector& vars) {
     // The cost is stored is the first element of `fg`.
-    fg[0] = 0;
+    fg[0] = 0.0;
     
     //
     // Setup Cost
     //
     for (int t = 0; t < N; ++t) {
-      fg[0] += CppAD::pow(vars[cte_start + t], 2);
-      fg[0] += CppAD::pow(vars[epsi_start + t], 2);
-      fg[0] += CppAD::pow(vars[v_start + t] - ref_v, 2);
+      fg[0] += 5 * CppAD::pow(vars[cte_start + t], 2);
+      fg[0] += 5 * CppAD::pow(vars[epsi_start + t], 2);
+      fg[0] += 2 * CppAD::pow(vars[v_start + t] - ref_v, 2);
     }
     
     // Minimize the use of actuators.
     for (int t = 0; t < N - 1; t++) {
-      fg[0] += CppAD::pow(vars[delta_start + t], 2);
-      fg[0] += CppAD::pow(vars[a_start + t], 2);
+      fg[0] += 120 * CppAD::pow(vars[delta_start + t], 2);
+      fg[0] += 10 * CppAD::pow(vars[a_start + t], 2);
     }
     
     // Minimize the value gap between sequential actuations.
-    static int factor = 100;
-    //Factor makes delta and acceleration values smoother
     for (int t = 0; t < N - 2; t++) {
-      fg[0] += factor * CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
-      fg[0] += factor * CppAD::pow(vars[a_start + t + 1] - vars[a_start + t], 2);
+      fg[0] += 100 * CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
+      fg[0] += 10 * CppAD::pow(vars[a_start + t + 1] - vars[a_start + t], 2);
     }
     
     //
@@ -97,8 +96,8 @@ class FG_eval {
       AD<double> delta0 = vars[delta_start + t - 1];
       AD<double> a0 = vars[a_start + t - 1];
       
-      AD<double> f0 = coeffs[0] + coeffs[1] * x0 + coeffs[2] * pow(x0, 2);
-      AD<double> psides0 = CppAD::atan(coeffs[1]);
+      AD<double> f0 = polyeval(coeffs, x0) - y0;
+      AD<double> psides0 = atan(polyderivativeeval(coeffs, x0));
       
       // Recall the equations for the model:
       // x_[t+1] = x[t] + v[t] * cos(psi[t]) * dt
@@ -125,7 +124,6 @@ MPC::~MPC() {}
 
 vector<vector<double>> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   bool ok = true;
-  size_t i;
   typedef CPPAD_TESTVECTOR(double) Dvector;
 
   // Number of state vars: 6
