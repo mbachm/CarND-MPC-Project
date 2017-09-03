@@ -82,6 +82,16 @@ int main() {
           // As mentioned in the "Tips and Tricks for the MPC Project" section, steer_value has to be
           // mulitplied by -1 for the simulator
           delta *= -1.0;
+          double acceleration = j[1]["throttle"];
+          
+          // Adding latency of 100 ms into the model
+          // See https://discussions.udacity.com/t/how-to-incorporate-latency-into-the-model/257391/4
+          const double latency = 0.1;
+          px = px + v*cos(psi)*latency;
+          py = py + v*sin(psi)*latency;
+          psi = psi + v*delta/Lf*latency;
+          v = v + acceleration*latency;
+          
           
           //Convert waypoints to car coordinate system
           vector<Eigen::VectorXd> local_waypoints = convertWaypoints(ptsx, ptsy, px, py, psi);

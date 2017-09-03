@@ -6,22 +6,10 @@
 
 using CppAD::AD;
 
-// TODO: Set the timestep length and duration
-const size_t N = 10;
+const size_t N = 7;
 const double dt = 0.15;
-
-// This value assumes the model presented in the classroom is used.
-//
-// It was obtained by measuring the radius formed by running the vehicle in the
-// simulator around in a circle with a constant steering angle and velocity on a
-// flat terrain.
-//
-// Lf was tuned until the the radius formed by the simulating the model
-// presented in the classroom matched the previous radius.
-//
-// This is the length from front to CoG that has a similar radius.
-const double Lf = 2.67;
-const double ref_v = 40;
+// Reference speed
+const double ref_v = 55;
 
 // The solver takes all the state variables and actuator
 size_t x_start = 0;
@@ -48,21 +36,21 @@ class FG_eval {
     // Setup Cost
     //
     for (int t = 0; t < N; ++t) {
-      fg[0] += 5 * CppAD::pow(vars[cte_start + t], 2);
-      fg[0] += 5 * CppAD::pow(vars[epsi_start + t], 2);
-      fg[0] += 2 * CppAD::pow(vars[v_start + t] - ref_v, 2);
+      fg[0] += 3 * CppAD::pow(vars[cte_start + t], 2);
+      fg[0] += 3 * CppAD::pow(vars[epsi_start + t], 2);
+      fg[0] += CppAD::pow(vars[v_start + t] - ref_v, 2);
     }
     
     // Minimize the use of actuators.
     for (int t = 0; t < N - 1; t++) {
-      fg[0] += 120 * CppAD::pow(vars[delta_start + t], 2);
-      fg[0] += 10 * CppAD::pow(vars[a_start + t], 2);
+      fg[0] += 60 * CppAD::pow(vars[delta_start + t], 2);
+      fg[0] += 5 * CppAD::pow(vars[a_start + t], 2);
     }
     
     // Minimize the value gap between sequential actuations.
     for (int t = 0; t < N - 2; t++) {
-      fg[0] += 100 * CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
-      fg[0] += 10 * CppAD::pow(vars[a_start + t + 1] - vars[a_start + t], 2);
+      fg[0] += 50 * CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
+      fg[0] += 5 * CppAD::pow(vars[a_start + t + 1] - vars[a_start + t], 2);
     }
     
     //
