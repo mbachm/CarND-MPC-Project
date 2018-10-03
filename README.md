@@ -23,7 +23,7 @@ The model is non-linear as it takes changes of heading direction into account. W
 The values for N and dt are 7 and 0.15. Together they define the prediction horizon as `T = N * dt`, which is 1.05 seconds in my solution. In this timespan the solver tries to find a trajectory to get as near to the waypoints as possible under the given cost function. Other values tried where 10/0.15, 20/0.05, 15/0.12 and 10/0.12 and more. But all of them did lead to worse results. 
 
 ### Polynomial Fitting and MPC Preprocessing
-With the provided function `polyfit` a polynomial is fitted to the provided waypoints (main.cpp, line 104). Before that, the waypoints are converted/transformed to the vehicle perspecitve. This simplifies the fitting of a polynomial as psi and the vehicles x and y coordinates are all zero.
+With the provided function `polyfit` a polynomial is fitted to the provided waypoints (main.cpp, line 104). Before that, the waypoints are converted/transformed to the vehicle perspective. This simplifies the fitting of a polynomial as psi and the vehicles x and y coordinates are all zero.
 Additionally, the latency is given to the model as a preprocessing step. This is covered in the next section.
 
 ### Model Predictive Control with Latency
